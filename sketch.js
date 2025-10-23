@@ -26,13 +26,7 @@ window.addEventListener('message', function (event) {
         
         console.log("新的分數已接收:", scoreText); 
         
-        // ----------------------------------------
-        // 關鍵步驟 2: 確保 draw() 執行
-        // ----------------------------------------
-        // 如果之前使用了 noLoop()，需要呼叫 loop() 來啟動動畫迴圈
-        if (typeof loop === 'function') {
-            loop(); 
-        }
+        // 由於 draw() 現在持續運行，這裡無需額外呼叫 loop() 或 redraw()。
     }
 }, false);
 
@@ -44,8 +38,10 @@ window.addEventListener('message', function (event) {
 function setup() { 
     // ... (其他設置)
     createCanvas(windowWidth / 2, windowHeight / 2); 
-    colorMode(HSB, 360, 100, 100, 100); // 使用 HSB 顏色模式，方便處理顏色
-    // 【重要修正】：移除 noLoop() 確保 draw 函式連續執行
+    // 設定顏色模式為 HSB (色相、飽和度、亮度、透明度 100)
+    colorMode(HSB, 360, 100, 100, 100); 
+    
+    // 【重要修正】：不使用 noLoop()，讓 draw 函式連續執行以產生動畫效果
 } 
 
 function draw() { 
@@ -69,11 +65,12 @@ function draw() {
         fill(120, 100, 80); // 綠色 
         text("恭喜！優異成績！", width / 2, height / 2 - 50);
 
-        // 【煙火發射邏輯】
-        // 只有在分數 90 分以上時，且每隔一段時間 (例如 30 幀) 
+        // 【煙火發射邏輯 - 修正 typo: frameFrame -> frameCount】
+        // 只有在分數 90 分以上時，且每隔一段時間 (約 1 秒) 
         // 才隨機發射新的煙火
-        if (frameCount % 30 == 0 || frameFrame - lastFireworkTime > 60) {
+        if (frameCount % 30 == 0 || frameCount - lastFireworkTime > 60) {
             let fireworkX = random(width * 0.2, width * 0.8);
+            // 從畫布底部發射
             fireworks.push(new Firework(fireworkX, height)); 
             lastFireworkTime = frameCount;
         }
@@ -84,7 +81,7 @@ function draw() {
         fill(45, 100, 100); 
         text("成績良好，請再接再厲。", width / 2, height / 2 - 50);
         
-    } else if (percentage >= 0) {
+    } else if (percentage > 0) {
         // 低分：顯示警示文本，使用紅色 
         fill(0, 100, 80); 
         text("需要加強努力！", width / 2, height / 2 - 50);
@@ -92,8 +89,8 @@ function draw() {
     } else {
         // 尚未收到分數或分數為 0
         fill(0, 0, 50); // 灰色
-        text(scoreText, width / 2, height / 2);
-        scoreDisplayY = height / 2; // 如果沒有成績，具體分數顯示在中間
+        text("等待成績...", width / 2, height / 2);
+        scoreDisplayY = height / 2 + 50; 
     }
 
     // 顯示具體分數
@@ -103,7 +100,7 @@ function draw() {
     
     
     // -----------------------------------------------------------------
-    // C. 更新並顯示煙火 (不論分數多少，持續更新已發射的煙火)
+    // C. 更新並顯示煙火 (動畫的核心)
     // -----------------------------------------------------------------
     
     for (let i = fireworks.length - 1; i >= 0; i--) {
@@ -134,14 +131,18 @@ class Firework {
 
     update() {
         if (!this.exploded) {
-            // 火箭上升
-            this.firework.applyForce(createVector(0, -0.05)); // 模擬推力
+            // 火箭上升 (向上推力)
+            this.firework.applyForce(createVector(0, -0.05)); 
+            // 模擬一點風的隨機影響
+            this.firework.applyForce(createVector(random(-0.01, 0.01), 0));
             this.firework.update();
 
             // 當火箭速度為正 (開始下落) 或到達一定高度 (低於 30% 處)，就爆炸
             if (this.firework.vel.y >= 0 || this.firework.pos.y < height * 0.3) {
                 this.explode();
                 this.exploded = true;
+                // 確保爆炸的粒子不再從火箭位置開始
+                this.firework = null; 
             }
         }
 
@@ -165,7 +166,7 @@ class Firework {
     }
 
     show() {
-        if (!this.exploded) {
+        if (!this.exploded && this.firework) {
             this.firework.show();
         }
         
@@ -224,16 +225,20 @@ class Particle {
 
     show() {
         // HSB 顏色設定：H(色相), S(飽和度), B(亮度), A(透明度)
-        let alpha = this.isFirespan;
+        let alpha = this.lifespan;
         let pHue = this.isFirework ? 30 : this.hue; // 火箭是橘黃色 (30)，爆炸粒子是隨機色
 
         strokeWeight(this.size);
         
         // 繪製發光效果：設置顏色為高飽和度、高亮度，並帶有透明度
+        // stroke/fill 的第四個參數是透明度 (alpha)，使用 lifespan 
         stroke(pHue, 100, 100, alpha);
-        fill(pHue, 100, 100, alpha); 
-
-        // 繪製粒子為點
+        
+        // 為了讓粒子更明顯，可以使用 fill 繪製一個小圓
+        // fill(pHue, 100, 100, alpha); 
+        // ellipse(this.pos.x, this.pos.y, this.size, this.size);
+        
+        // 或者只使用點 (point) 
         point(this.pos.x, this.pos.y);
     }
 }
